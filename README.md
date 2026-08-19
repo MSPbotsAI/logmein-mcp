@@ -48,10 +48,11 @@ Missing either header returns `401`:
 }
 ```
 
-An invalid username/password surfaces as a tool-level error (`Error:
-LogMeIn Rescue API error: login failed: INVALID`), not an HTTP-level
-error, since the failure only becomes known after the login step inside
-the tool call.
+An invalid username/password surfaces as a tool-level structured error
+(`{"error":{"code":"unauthorized","message":"login failed: INVALID","retryable":false}}`),
+not an HTTP-level error, since the failure only becomes known after the
+login step inside the tool call. See **Error Handling** below for the
+full error-code vocabulary.
 
 ## Environment Variables
 
@@ -64,9 +65,11 @@ the tool call.
 ## MCP Endpoint
 
 - `POST /mcp` — MCP protocol (streamable HTTP transport)
-- `GET /health` — health check, returns `{"status": "ok", "service": "logmein-mcp", "transport": "http"}`
+- `GET /health` — health check, returns `{"status": "ok"}` (pure local probe, does not depend on the LogMeIn Rescue API being reachable)
 
 ## Tool List
+
+All 4 tools are read-only (`readOnlyHint=True`); there are no write/delete tools in this service.
 
 | Tool | 功能 | 参数 |
 |---|---|---|
@@ -75,9 +78,35 @@ the tool call.
 | `logmein_get_chat` | 获取指定会话的聊天记录 | `session`（必填，会话 ID） |
 | `logmein_get_note` | 获取指定会话的技术员备注 | `session`（必填，会话 ID） |
 
-Responses are the vendor's raw pipe-delimited text (starting with `OK` or
-`ERROR`, never JSON), returned as-is — consistent with how the Rescue API
-itself replies.
+On success, responses are the vendor's raw pipe-delimited text (starting
+with `OK` or `ERROR`, never JSON), returned as-is — consistent with how
+the Rescue API itself replies — capped at 20,000 characters (truncated
+with a trailing notice if the vendor's response is larger).
+
+## Error Handling
+
+Transport/protocol-level failures (network errors, HTTP-level errors,
+login failures, invalid report parameters) are returned as a structured
+JSON error envelope instead of the raw vendor text:
+
+```json
+{"error": {"code": "unauthorized", "message": "login failed: INVALID", "retryable": false}}
+```
+
+`code` is one of a fixed vocabulary: `not_configured`, `unauthorized`,
+`not_found`, `invalid_argument`, `rate_limited`, `upstream_error`.
+`retryable` tells the caller whether retrying the same call might
+succeed (true for `rate_limited`/`upstream_error`, false otherwise).
+Network errors and HTTP `429`/`5xx` responses from the vendor are
+retried automatically (up to 3 attempts, capped exponential backoff,
+respecting `Retry-After`) before surfacing as `upstream_error`/
+`rate_limited`.
+
+A business-level `ERROR` body from the vendor's own API (e.g. an unknown
+session ID passed to `logmein_get_chat`/`logmein_get_note`) is **not**
+an error envelope — it is returned as-is in the raw text result, exactly
+as the vendor's API replies, since that's a normal (if empty/negative)
+query outcome rather than a transport failure.
 
 ## 测试示例
 

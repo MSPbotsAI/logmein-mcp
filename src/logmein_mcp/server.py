@@ -82,6 +82,24 @@ def create_mcp_server(settings: Settings) -> FastMCP:
     # correctly behind a reverse proxy or docker network.
     mcp = FastMCP(
         name="logmein-mcp",
+        instructions=(
+            "LogMeIn Rescue (part of GoTo) is a remote-support / screen-sharing "
+            "platform technicians use to connect to customer devices, chat with "
+            "end users, and log session notes. This server covers exactly the 4 "
+            "Rescue API methods MSPbots' own integration is configured for: "
+            "session listings, chat logs, session notes, and account-level "
+            "reporting — not account/CRM administration. Typical flow: call "
+            "logmein_get_session to find recent session IDs for a technician or "
+            "channel node, then logmein_get_chat / logmein_get_note to pull the "
+            "transcript or notes for a specific session. Use logmein_get_report "
+            "for account-level reporting (report_area selects the report type: "
+            "sessions, logins, chat logs, custom fields, etc.); the vendor "
+            "allows at most one report call per 60 seconds per account, so "
+            "avoid tight retry loops on it. Authentication is per-request: this "
+            "server logs in to Rescue fresh on every tool call using the "
+            "credentials supplied in that call's headers, and never caches a "
+            "session across calls or tenants. All 4 tools are read-only."
+        ),
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
 

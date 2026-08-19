@@ -1,0 +1,14 @@
+.venv/
+.env
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+tests/
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+CLAUDE.md
